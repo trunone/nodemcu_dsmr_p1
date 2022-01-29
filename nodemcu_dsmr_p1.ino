@@ -14,7 +14,8 @@ const char *ssid = STASSID;
 const char *pass = STAPSK;
 
 unsigned long last = 0;
-struct tm tmstruct;
+int last_hour = 0;
+struct tm ntp_time;
 
 IPAddress ipaddr(192, 168, 100, 19);
 IPAddress subnet(255, 255, 255, 0);
@@ -82,35 +83,19 @@ struct DsmrDashboard {
   void apply(Item &i) {
     if (i.present()) {
       if((String)Item::name == "energy_delivered_tariff1") {
-        if (energy_delivered_tariff1_last == 0) energy_delivered_tariff1_last = i.val();
-        energy_delivered_tariff1_axis[tmstruct.tm_hour] += i.val() - energy_delivered_tariff1_last;
-        energy_delivered_tariff1_last = i.val();
-        energy_delivered_tariff1_chart.updateX(time_axis, tmstruct.tm_hour+1);
-        energy_delivered_tariff1_chart.updateY(energy_delivered_tariff1_axis, tmstruct.tm_hour+1);
+        updateChart(i.val(), energy_delivered_tariff1_chart, energy_delivered_tariff1_axis, energy_delivered_tariff1_last);
         energy_delivered_tariff1_card.update(i.val());
       }
       if((String)Item::name == "energy_delivered_tariff2") {
-        if (energy_delivered_tariff2_last == 0) energy_delivered_tariff2_last = i.val();
-        energy_delivered_tariff2_axis[tmstruct.tm_hour] += i.val() - energy_delivered_tariff2_last;
-        energy_delivered_tariff2_last = i.val();
-        energy_delivered_tariff2_chart.updateX(time_axis, tmstruct.tm_hour+1);
-        energy_delivered_tariff2_chart.updateY(energy_delivered_tariff2_axis, tmstruct.tm_hour+1);
+        updateChart(i.val(), energy_delivered_tariff2_chart, energy_delivered_tariff2_axis, energy_delivered_tariff2_last);
         energy_delivered_tariff2_card.update(i.val());
       }
       if((String)Item::name == "energy_returned_tariff1") {
-        if (energy_returned_tariff1_last == 0) energy_returned_tariff1_last = i.val();
-        energy_returned_tariff1_axis[tmstruct.tm_hour] += i.val() - energy_returned_tariff1_last;
-        energy_returned_tariff1_last = i.val();
-        energy_returned_tariff1_chart.updateX(time_axis, tmstruct.tm_hour+1);
-        energy_returned_tariff1_chart.updateY(energy_returned_tariff1_axis, tmstruct.tm_hour+1);
+        updateChart(i.val(), energy_returned_tariff1_chart, energy_returned_tariff1_axis, energy_returned_tariff1_last);
         energy_returned_tariff1_card.update(i.val());
       }
       if((String)Item::name == "energy_returned_tariff2") {
-        if (energy_returned_tariff2_last == 0) energy_returned_tariff2_last = i.val();
-        energy_returned_tariff2_axis[tmstruct.tm_hour] += i.val() - energy_returned_tariff2_last;
-        energy_returned_tariff2_last = i.val();
-        energy_returned_tariff2_chart.updateX(time_axis, tmstruct.tm_hour+1);
-        energy_returned_tariff2_chart.updateY(energy_returned_tariff2_axis, tmstruct.tm_hour+1);
+        updateChart(i.val(), energy_returned_tariff2_chart, energy_returned_tariff2_axis, energy_returned_tariff2_last);
         energy_returned_tariff2_card.update(i.val());
       }
       if((String)Item::name == "power_delivered")
@@ -118,11 +103,7 @@ struct DsmrDashboard {
       if((String)Item::name == "power_returned")
         power_returned_card.update(i.val());
       if((String)Item::name == "gas_delivered") {
-        if (gas_delivered_last == 0) gas_delivered_last = i.val();
-        gas_delivered_axis[tmstruct.tm_hour] += i.val() - gas_delivered_last;
-        gas_delivered_last = i.val();
-        gas_delivered_chart.updateX(time_axis, tmstruct.tm_hour+1);
-        gas_delivered_chart.updateY(gas_delivered_axis, tmstruct.tm_hour+1);
+        updateChart(i.val(), gas_delivered_chart, gas_delivered_axis, gas_delivered_last);
         gas_delivered_card.update(i.val());
       }
     }
@@ -136,7 +117,7 @@ void setup() {
   Serial1.println("Setup...");
 
   Serial1.print("WiFi Connecting...");
-  WiFi.setHostname("Smart Meter");
+  WiFi.setHostname("SmartMeter");
   WiFi.mode(WIFI_STA);
   WiFi.config(ipaddr, gateway, subnet, dns1, dns2);
   WiFi.begin(ssid, pass);
@@ -162,6 +143,7 @@ void loop() {
       data.applyEach(DsmrPrinter());
       data.applyEach(DsmrDashboard());
       dashboard.sendUpdates();
+      last_hour = ntp_time.tm_hour;
     } else {
       Serial1.println(err);
     }
@@ -169,13 +151,22 @@ void loop() {
 
   unsigned long now = millis();
   if (now - last > 1000) {
-    tmstruct.tm_year = 0;
-    if(getLocalTime(&tmstruct, 5000)) {
-      Serial1.printf("\nNow is : %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+    ntp_time.tm_year = 0;
+    if(getLocalTime(&ntp_time, 5000)) {
+      Serial1.printf("\nNow is : %d-%02d-%02d %02d:%02d:%02d\n", (ntp_time.tm_year) + 1900, (ntp_time.tm_mon) + 1, ntp_time.tm_mday, ntp_time.tm_hour, ntp_time.tm_min, ntp_time.tm_sec);
       p1reader.enable(true);
     }
     last = now;
   }
+}
+
+void updateChart(auto value, Chart &chart, auto *axis, auto &last) {
+  if (last_hour != ntp_time.tm_hour) axis[ntp_time.tm_hour] = 0;
+  if (last == 0) last = value;
+  axis[ntp_time.tm_hour] += value - last;
+  last = value;
+  chart.updateX(time_axis, ntp_time.tm_hour+1);
+  chart.updateY(axis, ntp_time.tm_hour+1);
 }
 
 bool getLocalTime(struct tm * info, uint32_t ms) {
