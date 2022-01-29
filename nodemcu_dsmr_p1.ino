@@ -62,11 +62,11 @@ struct DsmrPrinter {
   template <typename Item>
   void apply(Item &i) {
     if (i.present()) {
-      Serial.print(Item::name);
-      Serial.print(F(": "));
-      Serial.print(i.val());
-      Serial.print(Item::unit());
-      Serial.println();
+      Serial1.print(Item::name);
+      Serial1.print(F(": "));
+      Serial1.print(i.val());
+      Serial1.print(Item::unit());
+      Serial1.println();
     }
   }
 };
@@ -130,20 +130,21 @@ struct DsmrDashboard {
 };
 
 void setup() {
-  Serial.begin(115200, SerialConfig::SERIAL_8N1, SerialMode::SERIAL_RX_ONLY, 0, true);
+  Serial.begin(115200, SerialConfig::SERIAL_8N1, SerialMode::SERIAL_RX_ONLY, -1, true);
   Serial.swap();
-  Serial.println("Setup...");
 
-  Serial.print("WiFi Connecting...");
+  Serial1.println("Setup...");
+
+  Serial1.print("WiFi Connecting...");
   WiFi.setHostname("Smart Meter");
   WiFi.mode(WIFI_STA);
   WiFi.config(ipaddr, gateway, subnet, dns1, dns2);
   WiFi.begin(ssid, pass);
   while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    Serial.print('.');
+    Serial1.print('.');
     delay(1000);
   }
-  Serial.println("Done");
+  Serial1.println("Done");
 
   configTime(3600, 0, "time.nist.gov", "0.pool.ntp.org", "1.pool.ntp.org");
 
@@ -162,7 +163,7 @@ void loop() {
       data.applyEach(DsmrDashboard());
       dashboard.sendUpdates();
     } else {
-      Serial.println(err);
+      Serial1.println(err);
     }
   }
 
@@ -170,7 +171,7 @@ void loop() {
   if (now - last > 1000) {
     tmstruct.tm_year = 0;
     if(getLocalTime(&tmstruct, 5000)) {
-      Serial.printf("\nNow is : %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
+      Serial1.printf("\nNow is : %d-%02d-%02d %02d:%02d:%02d\n", (tmstruct.tm_year) + 1900, (tmstruct.tm_mon) + 1, tmstruct.tm_mday, tmstruct.tm_hour, tmstruct.tm_min, tmstruct.tm_sec);
       p1reader.enable(true);
     }
     last = now;
